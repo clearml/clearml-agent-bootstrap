@@ -1,0 +1,2 @@
+include README.md
+recursive-include clearml_agent_bootstrap *
