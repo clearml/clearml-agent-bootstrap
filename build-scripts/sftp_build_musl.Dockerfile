@@ -1,4 +1,5 @@
-FROM alpine:3.22.1 AS builder
+ARG ALPINE_VERSION=3.22.1
+FROM alpine:${ALPINE_VERSION} AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \

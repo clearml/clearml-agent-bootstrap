@@ -1,1 +1,1 @@
-../../bootstrap/bootstrap.sh
+../../bootstrap/bootstrap_fast.sh

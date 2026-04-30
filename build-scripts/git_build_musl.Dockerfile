@@ -1,4 +1,5 @@
-FROM alpine:3.22.1 AS builder
+ARG ALPINE_VERSION=3.22.1
+FROM alpine:${ALPINE_VERSION} AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -15,7 +16,7 @@ RUN git clone https://github.com/google/brotli.git && cd brotli && mkdir out && 
 ARG PCRE_VERSION=10.45
 RUN wget https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${PCRE_VERSION}/pcre2-${PCRE_VERSION}.tar.bz2 && tar -xjf pcre2-${PCRE_VERSION}.tar.bz2
 #RUN find /usr -name 'libpcre2*' && rm /usr/lib/libpcre2-*.so* && find /usr -name 'libpcre2*'
-RUN cd pcre2-${PCRE_VERSION} && cmake -DPCRE2_BUILD_PCRE2_8=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=/usr . && make && make install
+RUN cd pcre2-${PCRE_VERSION} && cmake -DPCRE2_BUILD_PCRE2_8=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=/usr . && make -j$(nproc) && make install
 
 # # Set CURL version to build
 ARG CURL_VERSION=8.11.0
@@ -32,7 +33,7 @@ RUN apk add build-base clang openssl-dev nghttp2-dev nghttp2-static libssh2-dev 
 RUN rm -f /usr/lib/pkgconfig/libpcre2-8.pc /usr/lib/pkgconfig/libpcre2-posix.pc
 RUN find / -name 'libpcre2*'
 
-RUN cd curl-${CURL_VERSION}/ && export CC=clang && LDFLAGS="-static -static-libgcc -static-libstdc++ -Wl,-Bstatic -L/usr/lib -ldl" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-ldap --enable-ipv6 --enable-unix-sockets --with-ssl --with-libssh2 --with-brotli --with-zstd --disable-docs --disable-manual --without-libpsl && LDFLAGS="-static -static-libgcc -static-libstdc++ -all-static -Wl,-Bstatic" make -j8 V=1 && strip src/curl 
+RUN cd curl-${CURL_VERSION}/ && export CC=clang && LDFLAGS="-static -static-libgcc -static-libstdc++ -Wl,-Bstatic -L/usr/lib -ldl" PKG_CONFIG="pkg-config --static" ./configure --disable-shared --enable-static --disable-ldap --enable-ipv6 --enable-unix-sockets --with-ssl --with-libssh2 --with-brotli --with-zstd --disable-docs --disable-manual --without-libpsl && LDFLAGS="-static -static-libgcc -static-libstdc++ -all-static -Wl,-Bstatic" make -j$(nproc) V=1 && strip src/curl
 
 
 RUN cd curl-${CURL_VERSION}/ && ls -lah src/curl && file src/curl && ldd src/curl
@@ -42,11 +43,11 @@ RUN cd curl-${CURL_VERSION}/ && make install
 
 RUN apk add libpsl-static cmake
 
-RUN cd / && git clone https://github.com/c-ares/c-ares.git && cd c-ares && cmake -DCMAKE_BUILD_TYPE=Release -DCARES_SHARED=OFF -DCARES_STATIC=ON . && make -j8 && make install 
+RUN cd / && git clone https://github.com/c-ares/c-ares.git && cd c-ares && cmake -DCMAKE_BUILD_TYPE=Release -DCARES_SHARED=OFF -DCARES_STATIC=ON . && make -j$(nproc) && make install
 
 
 # Set GIT version to build
-ARG GIT_VERSION=2.45.1
+ARG GIT_VERSION=2.50.1
 
 # Download and extract Git source
 RUN wget https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.gz && \

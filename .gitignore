@@ -1,14 +1,13 @@
-# These are some examples of commonly ignored file patterns.
-# You should customize this list as applicable to your project.
-# Learn more about .gitignore:
-#     https://www.atlassian.com/git/tutorials/saving-changes/gitignore
-
 # Node artifact files
 node_modules/
 dist/
+bootstrap/bin/
 bootstrap/uv/
 bootstrap/git/
+bootstrap/dropbear/
 build/
+build-scripts/cpython_build/
+build-scripts/vscode_build/
 *.egg-info/
 
 # Compiled Java class files
@@ -53,4 +52,7 @@ Thumbs.db
 *.wmv
 *.tar
 *.tar.gz
+
+# Bootstrap wheel
+clearml_agent_bootstrap/data/bom.yaml
 

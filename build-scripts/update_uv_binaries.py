@@ -51,13 +51,17 @@ def download_and_extract(url, target_dir):
         print(f"Downloaded {local_filename} (no extraction attempted)")
 
 
-def get_latest_release_assets(owner, repo):
-    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+def get_release_assets(owner, repo, version="latest"):
+    if version and version.lower() != "latest":
+        url = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{version}"
+    else:
+        url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+
     response = requests.get(url)
-    response.raise_for_status()  # Raise an error for bad status codes
+    response.raise_for_status()
     release_data = response.json()
 
-    print(f"Latest release: {release_data['name']}")
+    print(f"Release: {release_data['name']}")
     print(f"Published at: {release_data['published_at']}")
     print("\nAssets:")
 
@@ -68,12 +72,11 @@ def get_latest_release_assets(owner, repo):
     else:
         for asset in assets:
             links[asset['name']] = asset['browser_download_url']
-            # print(f"- {asset['name']}: {asset['browser_download_url']}")
 
-    return links
+    return release_data['tag_name'], links
 
 
-# setuo    
+# setup
 target_path = "../bootstrap/uv" if len(sys.argv)<2 else sys.argv[1]
 current_dir = os.path.dirname(os.path.abspath(__file__))
 target_path = os.path.abspath(os.path.join(current_dir, target_path))
@@ -82,8 +85,11 @@ try:
 except FileExistsError:
     print(f"directory {target_path} already exists")
 
-# get latest links
-assets = get_latest_release_assets("astral-sh", "uv")
+# get release links (use UV_VERSION env var, default to "latest")
+uv_version = os.environ.get("UV_VERSION", "latest")
+print(f"UV version: {uv_version}")
+resolved_tag, assets = get_release_assets("astral-sh", "uv", version=uv_version)
+print(f"Resolved UV version: {resolved_tag}")
 relevant_assets = {k: v for k, v in assets.items() if not k.lower().endswith(".sha256") and ("x86_64-unknown-linux" in k.lower() or "aarch64-unknown-linux" in k)}
 
 # download files
@@ -92,3 +98,9 @@ for url in relevant_assets.values():
 
 # remove redundant files
 remove_files_by_pattern_rglob(target_path, "uvx")
+
+# write resolved version for BOM generation
+resolved_file = os.path.join(target_path, ".resolved_version")
+with open(resolved_file, "w") as f:
+    f.write(resolved_tag)
+print(f"Resolved version written to {resolved_file}")

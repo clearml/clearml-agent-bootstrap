@@ -9,23 +9,32 @@ import sys
 import subprocess
 import urllib.parse
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 # Configurations
-METADATA_URL = "https://raw.githubusercontent.com/astral-sh/uv/main/crates/uv-python/download-metadata.json"
-CUSTOM_SERVER_BASE = sys.argv[1] if len(sys.argv) > 1 else "https://download.clear.ml/cpython_builds/releases/"
+CPYTHON_STANDALONE_VERSION = os.environ.get("CPYTHON_STANDALONE_VERSION", "latest")
+if CPYTHON_STANDALONE_VERSION and CPYTHON_STANDALONE_VERSION.lower() != "latest":
+    METADATA_URL = f"https://raw.githubusercontent.com/astral-sh/uv/refs/tags/{CPYTHON_STANDALONE_VERSION}/crates/uv-python/download-metadata.json"
+else:
+    METADATA_URL = "https://raw.githubusercontent.com/astral-sh/uv/main/crates/uv-python/download-metadata.json"
+
+CUSTOM_SERVER_BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8080/cpython_build/releases/"
 TEMP_FILE = "__download-metadata.json"
-DOWNLOAD_DIR = sys.argv[2] if len(sys.argv) > 2 else "cpython_builds/releases/"
-OUT_METADATA_FILE = sys.argv[3] if len(sys.argv) > 3 else "cpython_builds/download-metadata.json"
+DOWNLOAD_DIR = sys.argv[2] if len(sys.argv) > 2 else "cpython_build/releases/"
+OUT_METADATA_FILE = sys.argv[3] if len(sys.argv) > 3 else "cpython_build/download-metadata.json"
+MAX_WORKERS = 4
 
 print("\nPreprocessing CPython standalone binary packages:")
+print(f"  CPYTHON_STANDALONE_VERSION = {CPYTHON_STANDALONE_VERSION}")
+print(f"  METADATA_URL = {METADATA_URL}")
 print(f"  CUSTOM_SERVER_BASE = {CUSTOM_SERVER_BASE}")
 print(f"  DOWNLOAD_DIR = {DOWNLOAD_DIR}")
 print(f"  OUT_METADATA_FILE = {OUT_METADATA_FILE}")
 print("\n\n")
 
-# Step 1: Download metadata file using wget
-subprocess.run(["wget", METADATA_URL, "-O", TEMP_FILE], check=True)
+# Step 1: Download metadata file using curl
+subprocess.run(["curl", "-sSL", METADATA_URL, "-o", TEMP_FILE], check=True)
 
 # Step 2: Load JSON content
 with open(TEMP_FILE, "r", encoding="utf-8") as f:
@@ -74,22 +83,31 @@ for key, entry in metadata.items():
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 filtered_dict = {}
 
-print("Downloadeding {} python binary packages: {}".format(download_count, DOWNLOAD_DIR))
+print(f"Downloading {download_count} python binary packages to: {DOWNLOAD_DIR}")
 
-for minor, arches in latest_versions.items():
-    for arch_key, info in arches.items():
-        url = info["url"]
-        filename = urllib.parse.unquote(url.split("/")[-1])
-        local_path = os.path.join(DOWNLOAD_DIR, filename)
+def download_file(info):
+    url = info["url"]
+    filename = urllib.parse.unquote(url.split("/")[-1])
+    local_path = os.path.join(DOWNLOAD_DIR, filename)
+    subprocess.run(["curl", "-sSL", url, "-o", local_path], check=True)
+    return info, filename
 
-        subprocess.run(["wget", url, "-O", local_path], check=True)
+futures = []
+with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    for minor, arches in latest_versions.items():
+        for arch_key, info in arches.items():
+            futures.append(executor.submit(download_file, info))
 
-        # Create new entry pointing to custom server
+    for idx, future in enumerate(as_completed(futures), 1):
+        info, filename = future.result()
+        print(f"Downloaded {idx}/{download_count}")
         key = info["key"]
         filtered_dict[key] = info["entry"]
-        filtered_dict[key]["url"] = urllib.parse.urljoin(CUSTOM_SERVER_BASE + "/", urllib.parse.quote(filename))
+        filtered_dict[key]["url"] = urllib.parse.urljoin(
+            CUSTOM_SERVER_BASE + "/", urllib.parse.quote(filename)
+        )
 
-print("Download completed")
+print("All downloads completed.")
 
 # Step 5: Output updated metadata
 with open(OUT_METADATA_FILE, "w", encoding="utf-8") as f:

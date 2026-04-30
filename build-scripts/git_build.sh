@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 replace_duplicates_with_symlink() {
     local basefile="$1"
@@ -47,28 +48,47 @@ replace_duplicates_with_symlink() {
 
 ## docker build -f git_build.Dockerfile --platform linux/amd64,linux/arm64 --progress=plain --output type=tar,dest=gitbin.tar .
 
-GIT_VERSION="${GIT_VERSION:-2.50.0}"
+GIT_VERSION="${GIT_VERSION:-2.50.1}"
 PCRE_VERSION="${PCRE_VERSION:-10.45}"
 CURL_VERSION="${CURL_VERSION:-8.11.0}"
 GIT_LFS_VERSION="${GIT_LFS_VERSION:-3.7.0}"
+ALPINE_VERSION="${ALPINE_VERSION:-3.22.1}"
 
 GIT_OUT_DIR="${1:-../bootstrap/git}"
 
 # Test by running: GIT_EXEC_PATH=$(pwd)/libexec/git-core GIT_TEMPLATE_DIR=$(pwd)/share/git-core/templates ./git clone https://...
 
-# AMD x86_64
+PIDS=()
+FAILURES=0
 
-docker build -f git_build_musl.Dockerfile --build-arg GIT_VERSION=$GIT_VERSION --build-arg GIT_LFS_VERSION=$GIT_LFS_VERSION --build-arg PCRE_VERSION=$PCRE_VERSION --build-arg CURL_VERSION=$CURL_VERSION --platform linux/amd64 --progress=plain --output type=tar,dest=gitbin_musl.tar .
-rm -rf $GIT_OUT_DIR/x64 && mkdir -p $GIT_OUT_DIR/x64 && tar -xf gitbin_musl.tar -C $GIT_OUT_DIR/x64
+# AMD x86_64
+(
+docker buildx build ${DOCKER_BUILDX_BUILDER:+--builder "$DOCKER_BUILDX_BUILDER"} --no-cache -f git_build_musl.Dockerfile --build-arg ALPINE_VERSION=$ALPINE_VERSION --build-arg GIT_VERSION=$GIT_VERSION --build-arg GIT_LFS_VERSION=$GIT_LFS_VERSION --build-arg PCRE_VERSION=$PCRE_VERSION --build-arg CURL_VERSION=$CURL_VERSION --platform linux/amd64 --progress=plain --output type=tar,dest=gitbin_musl_x64.tar .
+rm -rf $GIT_OUT_DIR/x64 && mkdir -p $GIT_OUT_DIR/x64 && tar -xf gitbin_musl_x64.tar -C $GIT_OUT_DIR/x64
 
 replace_duplicates_with_symlink "$GIT_OUT_DIR/x64/bin/git" "$GIT_OUT_DIR/x64/libexec/git-core" "../../bin/git"
 replace_duplicates_with_symlink "$GIT_OUT_DIR/x64/libexec/git-core/git-remote-https" "$GIT_OUT_DIR/x64/libexec/git-core" "git-remote-https"
+) &
+PIDS+=($!)
 
 # ARM AARCH64
-
-docker build -f git_build_musl.Dockerfile --build-arg GIT_VERSION=$GIT_VERSION --build-arg GIT_LFS_VERSION=$GIT_LFS_VERSION --build-arg PCRE_VERSION=$PCRE_VERSION --build-arg CURL_VERSION=$CURL_VERSION --platform linux/arm64/v8 --progress=plain --output type=tar,dest=gitbin_musl.tar .
-rm -rf $GIT_OUT_DIR/a64 && mkdir -p $GIT_OUT_DIR/a64 && tar -xf gitbin_musl.tar -C $GIT_OUT_DIR/a64
+(
+docker buildx build ${DOCKER_BUILDX_BUILDER:+--builder "$DOCKER_BUILDX_BUILDER"} --no-cache -f git_build_musl.Dockerfile --build-arg ALPINE_VERSION=$ALPINE_VERSION --build-arg GIT_VERSION=$GIT_VERSION --build-arg GIT_LFS_VERSION=$GIT_LFS_VERSION --build-arg PCRE_VERSION=$PCRE_VERSION --build-arg CURL_VERSION=$CURL_VERSION --platform linux/arm64/v8 --progress=plain --output type=tar,dest=gitbin_musl_a64.tar .
+rm -rf $GIT_OUT_DIR/a64 && mkdir -p $GIT_OUT_DIR/a64 && tar -xf gitbin_musl_a64.tar -C $GIT_OUT_DIR/a64
 
 replace_duplicates_with_symlink "$GIT_OUT_DIR/a64/bin/git" "$GIT_OUT_DIR/a64/libexec/git-core" "../../bin/git"
 replace_duplicates_with_symlink "$GIT_OUT_DIR/a64/libexec/git-core/git-remote-https" "$GIT_OUT_DIR/a64/libexec/git-core" "git-remote-https"
+) &
+PIDS+=($!)
 
+echo "[git_build] Waiting for x64 and a64 builds to complete..."
+for pid in "${PIDS[@]}"; do
+    if ! wait "$pid"; then
+        FAILURES=$((FAILURES + 1))
+    fi
+done
+
+if [[ $FAILURES -gt 0 ]]; then
+    echo "[git_build] ERROR: $FAILURES build(s) failed"
+    exit 1
+fi

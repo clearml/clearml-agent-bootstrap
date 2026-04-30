@@ -33,6 +33,7 @@ def install(output_dir, python_binary_metadata_file=None, force=False):
     tar1 = os.path.join(data_dir, 'uv.tar.gz')
     tar2 = os.path.join(data_dir, 'git.tar.gz')
     tar3 = os.path.join(data_dir, 'dropbear.tar.gz')
+    tar4 = os.path.join(data_dir, 'bin.tar.gz')
     script_path = os.path.join(data_dir, 'bootstrap.sh')
     local_version = os.path.join(os.path.dirname(__file__), 'version.py')
     target_version = os.path.join(output_dir, 'version.txt')
@@ -48,12 +49,17 @@ def install(output_dir, python_binary_metadata_file=None, force=False):
     os.makedirs(output_dir, exist_ok=True)
 
     # Extract both bundles
-    for tar_path in [tar1, tar2, tar3]:
+    for tar_path in [tar1, tar2, tar3, tar4]:
         with tarfile.open(tar_path, 'r:gz') as tar:
             tar.extractall(path=output_dir)
 
     # Copy the shell script
     shutil.copy(script_path, os.path.join(output_dir, 'bootstrap.sh'))
+
+    # Copy bom.yaml
+    bom_src = os.path.join(data_dir, 'bom.yaml')
+    if os.path.exists(bom_src):
+        shutil.copy2(bom_src, os.path.join(output_dir, 'bom.yaml'))
 
     # copy meta file
     if python_binary_metadata_file:

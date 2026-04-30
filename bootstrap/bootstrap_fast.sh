@@ -23,7 +23,8 @@ _UV_PYTHON_INSTALL_BIN="${UV_PYTHON_INSTALL_BIN}"
 _CLEARML_APT_INSTALL="${CLEARML_APT_INSTALL}"
 
 # bootstrap configs
-  export CLEARML_BOOTSTRAP_DIR="${CLEARML_BOOTSTRAP_DIR:-/.clearml.bootstrap}"
+  SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+  export CLEARML_BOOTSTRAP_DIR="${CLEARML_BOOTSTRAP_DIR:-$SCRIPT_DIR}"
 
 # print bom.yaml
   if [ -f "$CLEARML_BOOTSTRAP_DIR/bom.yaml" ]; then
@@ -34,13 +35,8 @@ _CLEARML_APT_INSTALL="${CLEARML_APT_INSTALL}"
   export CLEARML_BOOTSTRAP_RO_GIT="${CLEARML_BOOTSTRAP_RO_GIT:-$CLEARML_BOOTSTRAP_DIR/git}"
   export CLEARML_BOOTSTRAP_RO_SSHD="${CLEARML_BOOTSTRAP_RO_SSHD:-$CLEARML_BOOTSTRAP_DIR/dropbear}"
   export CLEARML_BOOTSTRAP_CACHE_DIR="${CLEARML_BOOTSTRAP_CACHE_DIR:-/tmp/.clearml.bootstrap.cache}"
-  # example: CLEARML_PYTHON_VER="3.12"
-  export CLEARML_PYTHON_VER="${CLEARML_PYTHON_VER:-3.12}"
   # example: CLEARML_UPDATE_UV="1"
   export CLEARML_UPDATE_UV="${CLEARML_UPDATE_UV:-}"
-  # example CLEARML_PIP_VER="\"pip<21 ; python_version < '3.11'\" \"pip<26 ; python_version >= '3.10'\""
-  export CLEARML_PIP_VER="${CLEARML_PIP_VER:--U \"pip<21 ; python_version < '3.11'\" \"pip<26 ; python_version >= '3.10'\"}"
-  export CLEARML_AGENT_VERSION="${CLEARML_AGENT_VERSION:-clearml_agent}"
 
 # cache folders
   export UV_PYTHON_CACHE_DIR="$CLEARML_BOOTSTRAP_CACHE_DIR/uv_python/"
@@ -55,6 +51,9 @@ _CLEARML_APT_INSTALL="${CLEARML_APT_INSTALL}"
   # export UV_NATIVE_TLS="${UV_NATIVE_TLS:-1}"
   # export UV_INSECURE_HOST="${UV_INSECURE_HOST}"
   # export GIT_SSL_NO_VERIFY="${GIT_SSL_NO_VERIFY}"
+
+# NOTICE! default is different from regular bootstrap, by default do not try to install ca-certifications
+  CLEARML_SKIP_CA_CERT_INST="${CLEARML_SKIP_CA_CERT_INST:-1}"
 
 # UV installer (should point to the file server"
   # export UV_INSTALLER_GHE_BASE_URL="${UV_INSTALLER_GHE_BASE_URL}"
@@ -84,6 +83,13 @@ _CLEARML_APT_INSTALL="${CLEARML_APT_INSTALL}"
 # Secure bootup process, pass execution script to be executed after bootstrap is completed and before any user code is executed
   # example: CLEARML_SECURE_PRE_CLEANUP_CMD="\$LOCAL_PYTHON /mounted/cleanup_script.py"
 
+# determine if we are using SH or Bash compatible for execution
+_SHELL="${SHELL:-/bin/bash}"
+if [ -z "$SHELL" ] && [ "$(echo {A,B})" != "A B" ]; then
+  _SHELL="/bin/sh"
+fi
+echo SHELL="$_SHELL"
+
 
 # building from source might fail so we disable it
 export UV_NO_BUILD_PACKAGE="${UV_NO_BUILD_PACKAGE:-1}"
@@ -91,12 +97,53 @@ export UV_BREAK_SYSTEM_PACKAGES=1
 export PIP_BREAK_SYSTEM_PACKAGES=1
 export UV_PYTHON_INSTALL_BIN=0
 
-# determine if we are using SH or Bash compatible for execution
-_SHELL="${SHELL:-/bin/bash}"
-if [ -z "$SHELL" ] && [ "$(echo {A,B})" != "A B" ]; then
-  _SHELL="/bin/sh"
+
+# check if we have a working agent
+RAW_ARCH=$(uname -m)
+if [ "$RAW_ARCH" = "x86_64" ] || [ "$RAW_ARCH" = "amd64" ]; then
+    ARCH="x86_64"
+elif [ "$RAW_ARCH" = "aarch64" ] || [ "$RAW_ARCH" = "arm64" ]; then
+    ARCH="aarch64"
+else
+    ARCH="unknown"
 fi
-echo SHELL="$_SHELL"
+if ldd --version 2>&1 | grep -qi musl; then
+    LIBC="musl"
+    _UV_ARCH_DIR="uv-$ARCH-unknown-linux-musl"
+else
+    LIBC="glibc"
+    _UV_ARCH_DIR="uv-$ARCH-unknown-linux-gnu"
+fi
+
+# --- Check the 4 combinations ---
+if [ "$ARCH" = "x86_64" ] && [ "$LIBC" = "glibc" ]; then
+    AGENT_BIN="$CLEARML_BOOTSTRAP_DIR/bin/x64/glib/clearml_agent.bin"
+elif [ "$ARCH" = "x86_64" ] && [ "$LIBC" = "musl" ]; then
+    AGENT_BIN="$CLEARML_BOOTSTRAP_DIR/bin/x64/musl/clearml_agent.bin"
+elif [ "$ARCH" = "aarch64" ] && [ "$LIBC" = "glibc" ]; then
+    AGENT_BIN="$CLEARML_BOOTSTRAP_DIR/bin/a64/glib/clearml_agent.bin"
+elif [ "$ARCH" = "aarch64" ] && [ "$LIBC" = "musl" ]; then
+    AGENT_BIN="$CLEARML_BOOTSTRAP_DIR/bin/a64/musl/clearml_agent.bin"
+else
+    echo "WARNING: Failed to detect architecture/libc combination"
+    # try x64 (x86-64) and a64 (aarch64) versions
+    if "$CLEARML_BOOTSTRAP_DIR/bin/x64/glib/clearml_agent.bin" --version >/dev/null 2>&1; then
+      AGENT_BIN="$CLEARML_BOOTSTRAP_DIR/bin/x64/glib/clearml_agent.bin"
+    elif "$CLEARML_BOOTSTRAP_DIR/bin/x64/musl/clearml_agent.bin" --version >/dev/null 2>&1; then
+      AGENT_BIN="$CLEARML_BOOTSTRAP_DIR/bin/x64/musl/clearml_agent.bin"
+    elif "$CLEARML_BOOTSTRAP_DIR/bin/a64/glib/clearml_agent.bin" --version >/dev/null 2>&1; then
+      AGENT_BIN="$CLEARML_BOOTSTRAP_DIR/bin/a64/glib/clearml_agent.bin"
+    elif "$CLEARML_BOOTSTRAP_DIR/bin/a64/musl/clearml_agent.bin" --version >/dev/null 2>&1; then
+      AGENT_BIN="$CLEARML_BOOTSTRAP_DIR/bin/a64/musl/clearml_agent.bin"
+    fi
+fi
+# check if agent works
+echo INFO: selected clearml-agent $AGENT_BIN
+if [ -z "$AGENT_BIN" ] || ! "$AGENT_BIN" --version >/dev/null 2>&1 ; then
+    echo "ERROR! [ARCH=$RAW_ARCH] no working clearml-agent matching your platform could be found!"
+    exit 1
+fi
+
 
 # check networking ca-certification files
 if [ -z "$SSL_CERT_FILE" ]; then
@@ -138,7 +185,7 @@ if [ -n "$CLEARML_SECURE_PRE_CLEANUP_CMD" ]; then
 fi
 
 # set the package cmd line based on the distro
-if command -v apt-get >/dev/null 2>&1; then
+if command -v apt-get > /dev/null 2>&1; then
   echo "Binary::apt::APT::Keep-Downloaded-Packages \"true\";" > /etc/apt/apt.conf.d/docker-clean
   export DEBIAN_FRONTEND=noninteractive
   if [ "$(id -u)" -eq 0 ]; then
@@ -146,19 +193,19 @@ if command -v apt-get >/dev/null 2>&1; then
   else
     PKG_INSTALL_CMD="(\$APT_UPDATE_CALLED || sudo apt-get update -y) && sudo apt-get install -y"
   fi
-elif command -v dnf >/dev/null 2>&1; then
+elif command -v dnf > /dev/null 2>&1; then
   if [ "$(id -u)" -eq 0 ]; then
     PKG_INSTALL_CMD="dnf install -y"
   else
     PKG_INSTALL_CMD="sudo dnf install -y"
   fi
-elif command -v yum >/dev/null 2>&1; then
+elif command -v yum > /dev/null 2>&1; then
   if [ "$(id -u)" -eq 0 ]; then
     PKG_INSTALL_CMD="yum install -y"
   else
     PKG_INSTALL_CMD="sudo yum install -y"
   fi
-elif command -v apk >/dev/null 2>&1; then
+elif command -v apk > /dev/null 2>&1; then
   if [ "$(id -u)" -eq 0 ]; then
     PKG_INSTALL_CMD="apk update && apk add"
   else
@@ -167,7 +214,6 @@ elif command -v apk >/dev/null 2>&1; then
 else
     PKG_INSTALL_CMD=
 fi
-
 
 # run custom script here unless secure bootup
 if [ -z "$CLEARML_SECURE_PRE_CLEANUP_CMD" ]; then
@@ -181,8 +227,7 @@ if [ -z "$CLEARML_SECURE_PRE_CLEANUP_CMD" ]; then
   fi
 fi
 
-CLEARML_SKIP_CA_CERT_INST="${CLEARML_SKIP_CA_CERT_INST:-0}"
-if [ -n "${CLEARML_SKIP_CA_CERT_INST}" ] && [ "${CLEARML_SKIP_CA_CERT_INST}" -gt 0 ]; then 
+if [ -n "${CLEARML_SKIP_CA_CERT_INST}" ] && [ "${CLEARML_SKIP_CA_CERT_INST}" -gt 0 ]; then
   echo "INFO: CLEARML_SKIP_CA_CERT_INST=$CLEARML_SKIP_CA_CERT_INST skipping ca-certificates install"
 else
   if [ -n "$CLEARML_APT_INSTALL" ]; then
@@ -199,17 +244,6 @@ if [ -n "$CLEARML_APT_INSTALL" ]; then
   APT_UPDATE_CALLED=true
 fi
 
-# checking for GIT executable, install if needed
-if ! command -v git >/dev/null 2>&1; then
-    # check if we need to skip the git install
-    CLEARML_SKIP_GIT_INST="${CLEARML_SKIP_GIT_INST:-0}"
-    if [ -n "${CLEARML_SKIP_GIT_INST}" ] && [ "${CLEARML_SKIP_GIT_INST}" -gt 0 ]; then
-      echo "INFO: CLEARML_SKIP_GIT_INST=$CLEARML_SKIP_GIT_INST skipping git install and using static git executable"
-    else
-      # try to install if we are root
-      (eval "$PKG_INSTALL_CMD git") || echo "WARNING: failed installing git"
-    fi
-fi
 
 # check if we need to use the static build
 CLEARML_FORCE_STATIC_GIT_BIN="${CLEARML_FORCE_STATIC_GIT_BIN:-0}"
@@ -242,100 +276,18 @@ if ( [ -n "$CLEARML_FORCE_STATIC_GIT_BIN" ] && [ "$CLEARML_FORCE_STATIC_GIT_BIN"
   fi
 fi
 
-# test git
-echo "INFO: testing git command"
-git --version
-
-# check if we already have python and pip installed
-LOCAL_PYTHON="${LOCAL_PYTHON}"
-
-# Check if python3 is installed
-if [ -z "$LOCAL_PYTHON" ]; then
-  i=30
-  while [ "$i" -ge 5 ]; do    
-    if command -v python3.$i >/dev/null 2>&1 ; then
-      echo "INFO: Python 3.$i is installed"
-      LOCAL_PYTHON="$(command -v python3.$i)"
-
-      # Now check for pip3 or pip
-      if $LOCAL_PYTHON -m pip --version >/dev/null 2>&1 ; then
-        echo "INFO: Python 3.$i and pip are installed"
-        break
-      else
-        echo "INFO: pip is MISSING from pre-installed python3.$i"
-        LOCAL_PYTHON=""
-      fi
-    fi
-    i=$((i - 1))
-  done
-  # if for some reason we failed and we still have python3, try just python3
-  if [ -z "$LOCAL_PYTHON" ]; then
-    if command -v python3 >/dev/null 2>&1 ; then
-      echo "INFO: Python3 is installed"
-      LOCAL_PYTHON="$(command -v python3)"
-
-      # Now check for pip3 or pip
-      if $LOCAL_PYTHON -m pip >/dev/null 2>&1 ; then
-        echo "INFO: Python3 and pip are installed"
-      else
-        echo "INFO: pip is MISSING from pre-installed python"
-        LOCAL_PYTHON=""
-      fi
-    fi
-  fi
-fi
-
 
 # remove PEP 668 - system packages should always be optional inside container
 rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED
 
 
 CLEARML_BOOTSTRAP_UV_EXEC=""
-if [ -n "$LOCAL_PYTHON" ]; then
-
-  # check python version
-  PYTHON_VERSION_CHECK="$($LOCAL_PYTHON --version)"
-  set -- $PYTHON_VERSION_CHECK
-  for last; do :; done
-  PYTHON_VERSION_CHECK="$last"
-
-  IFS='.' read -r w1 w2 w3 << EOF
-$PYTHON_VERSION_CHECK
-EOF
-
-  # check that we have at least python 3.6
-  if [ "$w1" -ge 3 ] && [ "$w2" -ge 6 ]; then
-    echo "INFO: Python version found $w1.$w2 is valid, validating pip version"
-
-    if [ -n "$CLEARML_PIP_VER" ]; then
-      echo "$LOCAL_PYTHON" -m pip install ${CLEARML_PIP_VER}
-      eval "$LOCAL_PYTHON" -m pip install ${CLEARML_PIP_VER}
-    fi
-
-    # we have python and pip so we need to use it
-    if $LOCAL_PYTHON -m pip install "$CLEARML_AGENT_VERSION" ; then
-      echo "INFO: clearml-agent successfully installed"
-    else
-      echo ""
-      echo "WARNING: Failed installing using preinstalled python, using bootstrap UV"
-      echo ""
-      LOCAL_PYTHON=
-    fi
-  else
-    if [ -z "$PYTHON_VERSION_CHECK" ]; then
-      echo "INFO: No installed python found, bootstrapping with UV"
-    else
-      echo "INFO: Installed python version is too old $PYTHON_VERSION_CHECK < 3.6 , bootstrapping with UV"
-    fi
-    LOCAL_PYTHON=
-  fi
-fi
 
 # if we do not install environment using bootstrap UV
 echo "INFO: selecting UV binary"
 
 # find the correct UV version
-for uv_dir in "$CLEARML_BOOTSTRAP_RO_UV"/*; do
+  uv_dir="$CLEARML_BOOTSTRAP_RO_UV/$_UV_ARCH_DIR"
   if [ -x "$uv_dir/uv" ]; then
       echo "INFO: trying: $uv_dir/uv"
       if "$uv_dir/uv" --version > /dev/null 2>&1 ; then
@@ -354,22 +306,15 @@ for uv_dir in "$CLEARML_BOOTSTRAP_RO_UV"/*; do
           echo "INFO: Found working UV : $CLEARML_BOOTSTRAP_UV_EXEC"
           export PATH="$CLEARML_UV_DIR_TMP:$PATH"
           echo "INFO: PATH=$PATH"
-          break
       fi
   fi
-done
 
-if [ -z "$LOCAL_PYTHON" ]; then
-  echo "INFO: bootstrapping with UV"
 
-  # Leave if we failed to find the UV executable
-  if [ -z "$CLEARML_BOOTSTRAP_UV_EXEC" ]; then
-    echo "ERROR: COULD NOT FIND WORKING UV executable for the environment, LEAVING!"
-	exit 1
-  fi
 
-  # update UV if we need to
-  if [ -n "$CLEARML_UPDATE_UV" ] && [ "$CLEARML_UPDATE_UV" -gt 0 ] ; then
+echo "INFO: bootstrapping with UV"
+
+# update UV if we need to
+if [ -n "$CLEARML_UPDATE_UV" ] && [ "$CLEARML_UPDATE_UV" -gt 0 ] ; then
 
     CLEARML_BOOTSTRAP_UV_DIR="$UV_INSTALL_DIR"
     mkdir -p "$CLEARML_BOOTSTRAP_UV_DIR"
@@ -379,32 +324,21 @@ if [ -z "$LOCAL_PYTHON" ]; then
     # get the UV version
     UV_VERSION_OUT=$("$CLEARML_BOOTSTRAP_UV_EXEC" --version)
     set -- $UV_VERSION_OUT
-    UV_VERSION="${!#}"
+    for last; do :; done
+    UV_VERSION=$last
 
     echo "{\"binaries\":[\"uv\"],\"binary_aliases\":{},\"cdylibs\":[],\"cstaticlibs\":[],\"install_layout\":\"flat\",\"install_prefix\":\"$CLEARML_BOOTSTRAP_UV_DIR\",\"modify_path\":true,\"provider\":{\"source\":\"cargo-dist\",\"version\":\"0.28.7-prerelease.1\"},\"source\":{\"app_name\":\"uv\",\"name\":\"uv\",\"owner\":\"astral-sh\",\"release_type\":\"github\"},\"version\":\"$UV_VERSION\"}" > "$CLEARML_BOOTSTRAP_UV_DIR/uv-receipt.json"
 
     CUR_DIR=$(pwd) ; cd "$CLEARML_BOOTSTRAP_UV_DIR" ; AXOUPDATER_CONFIG_WORKING_DIR="$CLEARML_BOOTSTRAP_UV_DIR" "$CLEARML_BOOTSTRAP_UV_EXEC" self update ; cd "$CUR_DIR"
-  fi
 
-  # install a new PYTHON with pip
-  "$CLEARML_BOOTSTRAP_UV_EXEC" python install "$CLEARML_PYTHON_VER"
-  LOCAL_PYTHON=$("$CLEARML_BOOTSTRAP_UV_EXEC" python find --managed-python)
-  "$CLEARML_BOOTSTRAP_UV_EXEC" pip install --python "$LOCAL_PYTHON" pip setuptools "$CLEARML_AGENT_VERSION"
-
-  # debug print
-  echo "INFO: New python environment install in: LOCAL_PYTHON=$LOCAL_PYTHON"
-
-  # update path
-  export PATH="$CLEARML_BOOTSTRAP_UV_DIR:$PATH"
+    # update path
+    export PATH="$CLEARML_BOOTSTRAP_UV_DIR:$PATH"
 fi
+
 
 # set git to use static mapped git if it is not already installed or installation fails
 echo "DEBUG: CLEARML_BOOTSTRAP_UV_EXEC=$CLEARML_BOOTSTRAP_UV_EXEC"
 export CLEARML_BOOTSTRAP_UV_EXEC=$CLEARML_BOOTSTRAP_UV_EXEC
-
-# set python to the new installed environment and use the agent's package manager
-export LOCAL_PYTHON="$LOCAL_PYTHON"
-
 
 if [ -z "$CLEARML_DROPBEAR_EXEC" ]; then
   # try x64 (x86-64) and a64 (aarch64) versions
@@ -434,7 +368,6 @@ unset CLEARML_BOOTSTRAP_DIR
 unset CLEARML_BOOTSTRAP_RO_UV
 unset CLEARML_BOOTSTRAP_RO_GIT
 unset CLEARML_BOOTSTRAP_RO_SSHD
-unset CLEARML_AGENT_VERSION
 unset CLEARML_BOOTSTRAP_CACHE_DIR
 if [ -z "$_UV_CONFIG_FILE" ]; then
   unset UV_CONFIG_FILE
@@ -491,7 +424,7 @@ if [ -n "$CLEARML_SECURE_PRE_CLEANUP_CMD" ]; then
   if [ -n "$CLEARML_BOOTSTRAP_CUSTOM_CMD_BASE64" ]; then
     eval "$(echo "$CLEARML_BOOTSTRAP_CUSTOM_CMD_BASE64" | base64 -d)"
   fi
-  
+
   # Now check if we were supposed to also install something (same order as before, fist pre cmd then install package)
   if [ -n "$_CLEARML_APT_INSTALL" ]; then
     eval "$PKG_INSTALL_CMD $_CLEARML_APT_INSTALL"
@@ -516,5 +449,5 @@ unset CLEARML_PRE_CUSTOM_CMD_BASE64
 unset CLEARML_APT_INSTALL
 
 # run the agent
-echo "$LOCAL_PYTHON" -u -m clearml_agent "$CMD_ARGS"
-exec $LOCAL_PYTHON -u -m clearml_agent $CMD_ARGS
+echo Running: "$AGENT_BIN" "$CMD_ARGS"
+exec "$AGENT_BIN" $CMD_ARGS

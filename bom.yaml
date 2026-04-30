@@ -1,0 +1,34 @@
+# Bill of Materials - Centralized version definitions
+
+# Git stack
+GIT_VERSION: "2.50.1"
+GIT_LFS_VERSION: "3.7.0"
+PCRE_VERSION: "10.45"
+CURL_VERSION: "8.11.0"
+
+# SSH / SFTP
+DROPBEAR_VER: "DROPBEAR_2025.88"
+OPENSSH_SFTP_VER: "V_10_0_P2"
+
+# uv package manager (astral-sh/uv release tag, or "latest")
+UV_VERSION: "latest"
+# CPython standalone builds (uv tag to source metadata from, or "latest" for main branch)
+CPYTHON_STANDALONE_VERSION: "latest"
+
+# Build toolchain
+NUITKA_VERSION: "2.8.9"
+PATCHELF_VERSION: "0.18.0"
+PYTHON_VERSION: "3.12"
+
+# Base images
+ALPINE_VERSION: "3.22.1"
+# K8s bootstrap DHI alpine-base image
+DHI_ALPINE_VERSION: "3.23"
+FEDORA_VERSION: "26"
+# K8s bootstrap base ubuntu image
+UBUNTU_VERSION: "24.04"
+# Offline bootstrap resources server base nginx image
+NGINX_VERSION: "1.29.7-alpine"
+
+# VSCode / code-server
+VSCODE_VERSION: "4.112.0"
