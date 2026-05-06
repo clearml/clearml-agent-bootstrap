@@ -77,7 +77,7 @@ This last command downloads the latest available `clearml-agent-bootstrap` distr
 |---|---|
 | `--check` | Preview a dry-run of the command without making changes. |
 | `--force` | Force reinstall even if the same version is already installed. |
-| `--version TAG` | Install a specific release version (e.g., `v1.0.0+24`). |
+| `--version TAG` | Install a specific release version (e.g., `v1.0.0`). |
 | `--from-file PATH` | Install from a local `.whl` file instead of downloading from the official GitHub Releases. |
 
 #### Examples
@@ -87,10 +87,10 @@ This last command downloads the latest available `clearml-agent-bootstrap` distr
 clearml-agent install-bootstrap --check
 
 # Install a specific version
-clearml-agent install-bootstrap --version v1.0.0+24
+clearml-agent install-bootstrap --version v1.0.0
 
 # Install from a local wheel
-clearml-agent install-bootstrap --from-file ./clearml_agent_bootstrap-1.0.0+24-py3-none-any.whl
+clearml-agent install-bootstrap --from-file ./clearml_agent_bootstrap-1.0.0-py3-none-any.whl
 
 # Force reinstall
 clearml-agent install-bootstrap --force
