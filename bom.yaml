@@ -7,7 +7,7 @@ PCRE_VERSION: "10.45"
 CURL_VERSION: "8.11.0"
 
 # SSH / SFTP
-DROPBEAR_VER: "DROPBEAR_2025.88"
+DROPBEAR_VER: "DROPBEAR_2025.89"
 OPENSSH_SFTP_VER: "V_10_0_P2"
 
 # uv package manager (astral-sh/uv release tag, or "latest")
