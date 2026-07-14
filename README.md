@@ -155,7 +155,7 @@ To build the package from source, use the provided script:
 
 ```bash
 cd build-scripts
-GIT_VERSION="2.50.1" GIT_LFS_VERSION="3.7.0" PCRE_VERSION="10.45" CURL_VERSION="8.11.0"  DROPBEAR_VER="DROPBEAR_2025.88" OPENSSH_SFTP_VER="V_10_0_P2" ./build_all.sh
+GIT_VERSION="2.55.0" GIT_LFS_VERSION="3.7.1" PCRE_VERSION="10.45" CURL_VERSION="8.11.0"  DROPBEAR_VER="DROPBEAR_2025.89" OPENSSH_SFTP_VER="V_10_0_P2" ./build_all.sh
 cd ..
 ```
 
@@ -163,7 +163,7 @@ To optionally *compile the Agent executable* as well, pass the `BUILD_FROM_SOURC
 
 ```bash
 cd build-scripts
-GIT_VERSION="2.50.1" GIT_LFS_VERSION="3.7.0" PCRE_VERSION="10.45" CURL_VERSION="8.11.0"  DROPBEAR_VER="DROPBEAR_2025.88" OPENSSH_SFTP_VER="V_10_0_P2" BUILD_FROM_SOURCE=../../clearml-agent ./build_all.sh
+GIT_VERSION="2.55.0" GIT_LFS_VERSION="3.7.1" PCRE_VERSION="10.45" CURL_VERSION="8.11.0"  DROPBEAR_VER="DROPBEAR_2025.89" OPENSSH_SFTP_VER="V_10_0_P2" BUILD_FROM_SOURCE=../../clearml-agent ./build_all.sh
 cd ..
 ```
 

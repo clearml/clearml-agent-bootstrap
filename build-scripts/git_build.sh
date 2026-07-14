@@ -48,10 +48,10 @@ replace_duplicates_with_symlink() {
 
 ## docker build -f git_build.Dockerfile --platform linux/amd64,linux/arm64 --progress=plain --output type=tar,dest=gitbin.tar .
 
-GIT_VERSION="${GIT_VERSION:-2.50.1}"
+GIT_VERSION="${GIT_VERSION:-2.55.0}"
 PCRE_VERSION="${PCRE_VERSION:-10.45}"
 CURL_VERSION="${CURL_VERSION:-8.11.0}"
-GIT_LFS_VERSION="${GIT_LFS_VERSION:-3.7.0}"
+GIT_LFS_VERSION="${GIT_LFS_VERSION:-3.7.1}"
 ALPINE_VERSION="${ALPINE_VERSION:-3.22.1}"
 
 GIT_OUT_DIR="${1:-../bootstrap/git}"
