@@ -1,13 +1,13 @@
 # Bill of Materials - Centralized version definitions
 
 # Git stack
-GIT_VERSION: "2.50.1"
-GIT_LFS_VERSION: "3.7.0"
+GIT_VERSION: "2.55.0"
+GIT_LFS_VERSION: "3.7.1"
 PCRE_VERSION: "10.45"
 CURL_VERSION: "8.11.0"
 
 # SSH / SFTP
-DROPBEAR_VER: "DROPBEAR_2025.89"
+DROPBEAR_VER: "DROPBEAR_2026.91"
 OPENSSH_SFTP_VER: "V_10_0_P2"
 
 # uv package manager (astral-sh/uv release tag, or "latest")
@@ -18,7 +18,7 @@ CPYTHON_STANDALONE_VERSION: "latest"
 # Build toolchain
 NUITKA_VERSION: "2.8.9"
 PATCHELF_VERSION: "0.18.0"
-PYTHON_VERSION: "3.12"
+PYTHON_VERSION: "3.13"
 
 # Base images
 ALPINE_VERSION: "3.22.1"
