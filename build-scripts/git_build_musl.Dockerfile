@@ -104,9 +104,10 @@ RUN git clone --depth 1 --branch v${GIT_LFS_VERSION} https://github.com/git-lfs/
 
 WORKDIR /git-lfs
 
-ARG X_CRYPTO_VERSION=0.53.0
+ARG X_CRYPTO_VERSION=0.54.0
 ARG X_NET_VERSION=0.56.0
-RUN go get golang.org/x/crypto@v${X_CRYPTO_VERSION} golang.org/x/net@v${X_NET_VERSION} && go mod tidy
+ARG X_TEXT_VERSION=0.40.0
+RUN go get golang.org/x/crypto@v${X_CRYPTO_VERSION} golang.org/x/net@v${X_NET_VERSION} golang.org/x/text@v${X_TEXT_VERSION} && go mod tidy
 
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/git-lfs/git-lfs/v3/config.GitCommit=$(git rev-parse HEAD)" -o /usr/local/bin/git-lfs .
 RUN /usr/local/bin/git-lfs version
