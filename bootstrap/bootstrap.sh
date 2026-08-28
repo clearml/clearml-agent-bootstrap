@@ -98,6 +98,16 @@ if [ -z "$SHELL" ] && [ "$(echo {A,B})" != "A B" ]; then
 fi
 echo SHELL="$_SHELL"
 
+# Run user-supplied code in this shell (so it can export env vars / define functions for the
+# rest of the bootstrap), then restore our shell options. Custom scripts commonly start with
+# `set -euo pipefail`; without this those options leak and break the remaining bootstrap, which
+# is written assuming unset variables are empty (e.g. "CLEARML_APT_INSTALL: unbound variable").
+clearml_eval_user_cmd() {
+  _CLEARML_SAVED_SHELL_OPTS="$(set +o)"
+  eval "$1"
+  eval "$_CLEARML_SAVED_SHELL_OPTS"
+}
+
 # check networking ca-certification files
 if [ -z "$SSL_CERT_FILE" ]; then
   if [ -n "$CURL_CA_BUNDLE" ]; then
@@ -173,11 +183,11 @@ fi
 if [ -z "$CLEARML_SECURE_PRE_CLEANUP_CMD" ]; then
   # custom bash boot script
   if [ -n "$CLEARML_BOOTSTRAP_CUSTOM_CMD" ]; then
-    eval "$CLEARML_BOOTSTRAP_CUSTOM_CMD"
+    clearml_eval_user_cmd "$CLEARML_BOOTSTRAP_CUSTOM_CMD"
   fi
   # custom bash boot script (base64 format)
   if [ -n "$CLEARML_BOOTSTRAP_CUSTOM_CMD_BASE64" ]; then
-    eval "$(echo "$CLEARML_BOOTSTRAP_CUSTOM_CMD_BASE64" | base64 -d)"
+    clearml_eval_user_cmd "$(echo "$CLEARML_BOOTSTRAP_CUSTOM_CMD_BASE64" | base64 -d)"
   fi
 fi
 
@@ -481,15 +491,15 @@ fi
 
 # run the secure bootup script here after we completed the bootstrap process
 if [ -n "$CLEARML_SECURE_PRE_CLEANUP_CMD" ]; then
-  eval "$CLEARML_SECURE_PRE_CLEANUP_CMD"
+  clearml_eval_user_cmd "$CLEARML_SECURE_PRE_CLEANUP_CMD"
 
   # NOW, we can run custom script, only AFTER secure bootup script was executed
   if [ -n "$CLEARML_BOOTSTRAP_CUSTOM_CMD" ]; then
-    eval "$CLEARML_BOOTSTRAP_CUSTOM_CMD"
+    clearml_eval_user_cmd "$CLEARML_BOOTSTRAP_CUSTOM_CMD"
   fi
   # custom bash boot script (base64 format)
   if [ -n "$CLEARML_BOOTSTRAP_CUSTOM_CMD_BASE64" ]; then
-    eval "$(echo "$CLEARML_BOOTSTRAP_CUSTOM_CMD_BASE64" | base64 -d)"
+    clearml_eval_user_cmd "$(echo "$CLEARML_BOOTSTRAP_CUSTOM_CMD_BASE64" | base64 -d)"
   fi
   
   # Now check if we were supposed to also install something (same order as before, fist pre cmd then install package)
@@ -500,11 +510,11 @@ fi
 
 # custom user script
 if [ -n "$CLEARML_PRE_CUSTOM_CMD" ]; then
-  eval "$CLEARML_PRE_CUSTOM_CMD"
+  clearml_eval_user_cmd "$CLEARML_PRE_CUSTOM_CMD"
 fi
 # custom bash boot script (base64 format)
 if [ -n "$CLEARML_PRE_CUSTOM_CMD_BASE64" ]; then
-  eval "$(echo "$CLEARML_PRE_CUSTOM_CMD_BASE64" | base64 -d)"
+  clearml_eval_user_cmd "$(echo "$CLEARML_PRE_CUSTOM_CMD_BASE64" | base64 -d)"
 fi
 
 # final env cleanup
